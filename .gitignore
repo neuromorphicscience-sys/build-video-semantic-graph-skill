@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local project outputs and private model evidence
+work/model_requests/
+work/model_responses/
+work/model_cache/
+work/ark_files/
+work/audio/
+work/transcripts/
+work/model_outputs/
+reports/autolabel/
+data/generated/
+backend/app/data/*.generated.json
+backend/app/data/backup/
+
+# Media and large derived assets
+raw/
+frontend/public/media/videos/
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.wav
+*.mp3
+*.m4a
+*.xlsx

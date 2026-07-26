@@ -4,20 +4,17 @@
 
 An open-source Codex/agent skill for turning local short-video collections into a **timestamp-aware semantic search graph**.
 
-It inventories source media, extracts timestamped storyboards, calls a configured multimodal model for structured video understanding, recalls and reranks related clips, validates every reference, exports a human-review workbook, and only then applies generated JSON with automatic backup.
+It inventories media, extracts timestamped storyboards, calls a configured multimodal model for structured video understanding, creates entry-video semantic windows, labels result videos, recalls and reranks candidates, validates the graph, exports a human-review workbook, and applies generated JSON only after explicit approval and backup.
 
 > Built from the production workflow behind **CrossFrame — “pause to search, search to continue the story.”**
 
-## Why this skill exists
-
-Traditional video recommendation works at the video level. Visual search needs to understand **what is happening at the exact moment a user pauses**.
-
-This skill converts raw entry/result video folders into:
+## What the skill produces
 
 - timestamp-aware entry segments;
-- structured visual semantics for people, objects, actions, scenes, and event states;
-- recommendation edges from each pause-time segment to related result videos;
-- auditable model outputs and validation reports;
+- structured people, object, action, scene, and event-state semantics;
+- recommendation edges from pause-time segments to related result videos;
+- model-call and data-quality reports;
+- a human-review workbook;
 - runtime-ready `videos.json`, `segments.json`, and `relations.json`.
 
 ## Core pipeline
@@ -36,18 +33,18 @@ Local videos
   → explicit backup-and-apply
 ```
 
-## What is actually implemented
+## Honest technical scope
 
 The current implementation uses:
 
-1. **Timestamped storyboard extraction** from local videos.
-2. **A configurable vision-capable multimodal model** through an OpenAI-compatible API.
-3. **Strict structured outputs** for entry segmentation and result labeling.
-4. **Text/semantic candidate recall** followed by model reranking.
-5. **Graph-level validation** for timing, references, diversity, copyright state, and runtime files.
-6. **Human review before apply**, with timestamped backups.
+1. timestamped storyboard extraction from local videos;
+2. a configurable vision-capable multimodal model through an OpenAI-compatible API;
+3. strict structured outputs for entry segmentation and result labeling;
+4. text/semantic candidate recall followed by model reranking;
+5. graph-level validation for timing, references, diversity, copyright status, and runtime media;
+6. human review before apply, with timestamped backups.
 
-The project does **not** claim that a vector database or multimodal embedding model is mandatory. Those can be added as a scale-out retrieval layer, while this skill already provides the segment schema, validation contracts, and reranking workflow required by such a system.
+It does **not** claim that a vector database or multimodal embedding model is already mandatory. At platform scale, a multimodal embedding service can be added as the first-stage retrieval layer while retaining this skill's segment schema, validation contracts, and reranking workflow.
 
 ## Proven reference scale
 
@@ -58,49 +55,65 @@ The CrossFrame case study processed:
 - 100 timestamp-aware semantic segments;
 - a validated multi-round recommendation graph.
 
-The media, model responses, credentials, and project-specific runtime JSON are intentionally not included.
+Media, credentials, private model responses, and project-specific production JSON are intentionally excluded.
+
+## Distribution format
+
+The complete executable source is distributed as:
+
+```text
+dist/build-video-semantic-graph.skill
+```
+
+A `.skill` file is a ZIP-compatible source package containing `SKILL.md`, `agents/`, `references/`, and the full `scripts/` directory. Nothing is obfuscated or compiled.
+
+Package SHA-256:
+
+```text
+45defd220e6ebfae001fefffe991137227561ff7bed27bfd996a1174bd3566f8
+```
+
+Extract it with Python:
+
+```bash
+python tools/unpack_skill.py --output unpacked
+```
+
+Or with any ZIP utility after copying/renaming the file to `.zip`.
 
 ## Repository structure
 
 ```text
 .
 ├── SKILL.md
-├── agents/
-│   └── openai.yaml
+├── agents/openai.yaml
 ├── references/
-│   ├── crossframe-case-study.md
-│   ├── data-contracts.md
-│   ├── model-configuration.md
-│   ├── prompt-design.md
-│   ├── validation-rules.md
-│   └── prompts/
-├── scripts/
-│   ├── run_pipeline.py
-│   ├── extract_video_features.py
-│   ├── analyze_videos_with_model.py
-│   ├── build_recommendation_graph.py
-│   ├── validate_generated_data.py
-│   ├── export_review_workbook.py
-│   └── requirements.txt
-└── dist/
-    └── build-video-semantic-graph.skill
+├── dist/build-video-semantic-graph.skill
+├── tools/unpack_skill.py
+├── SOURCE.md
+├── README.md
+├── README.zh-CN.md
+├── LICENSE
+├── CONTRIBUTING.md
+└── SECURITY.md
 ```
+
+After extraction, the full runnable tree additionally contains `scripts/`.
 
 ## Requirements
 
 - Python 3.10+
-- `ffmpeg` and `ffprobe` on `PATH`
-- A vision-capable multimodal model endpoint for the analysis phase
+- `ffmpeg` and `ffprobe` available on `PATH`
+- a vision-capable multimodal model endpoint for the analysis phase
 
-Install Python dependencies:
+Extract and install dependencies:
 
 ```bash
-python -m pip install -r scripts/requirements.txt
+python tools/unpack_skill.py --output unpacked
+python -m pip install -r unpacked/scripts/requirements.txt
 ```
 
-## Expected project layout
-
-The target video project should contain:
+## Expected target-project layout
 
 ```text
 project/
@@ -113,7 +126,7 @@ project/
 └── work/
 ```
 
-Source videos under `raw/` are treated as immutable.
+Source videos under `raw/` are immutable.
 
 ## Model configuration
 
@@ -126,32 +139,30 @@ export CROSSFRAME_VLM_API_KEY=<secret>
 export CROSSFRAME_VLM_BASE_URL=<openai-compatible-base-url>
 ```
 
-`ARK_API_KEY` is supported only as a legacy environment alias.
-
-Never commit credentials, `.env` files containing secrets, model request/response caches, extracted audio, or transcripts.
+Never commit credentials, secret-bearing `.env` files, private model request/response caches, extracted audio, or transcripts.
 
 ## Quick start
 
-Run a safe dry run first:
+Safe dry run:
 
 ```bash
-python scripts/run_pipeline.py \
+python unpacked/scripts/run_pipeline.py \
   --project-root /path/to/project \
   --dry-run
 ```
 
-Run the full pipeline:
+Full pipeline:
 
 ```bash
-python scripts/run_pipeline.py \
+python unpacked/scripts/run_pipeline.py \
   --project-root /path/to/project \
   --mode all
 ```
 
-Validate and require three distinct recommendations per source segment:
+Validate three distinct recommendations per source segment:
 
 ```bash
-python scripts/run_pipeline.py \
+python unpacked/scripts/run_pipeline.py \
   --project-root /path/to/project \
   --mode validate \
   --require-three-results
@@ -160,7 +171,7 @@ python scripts/run_pipeline.py \
 Apply generated data only after review:
 
 ```bash
-python scripts/run_pipeline.py \
+python unpacked/scripts/run_pipeline.py \
   --project-root /path/to/project \
   --mode validate \
   --require-three-results \
@@ -169,35 +180,20 @@ python scripts/run_pipeline.py \
 
 The apply step creates a timestamped backup before replacing formal runtime JSON.
 
-## Available modes
-
-| Mode | Purpose |
-|---|---|
-| `inventory` | Inventory videos and detect decode/codec problems |
-| `extract` | Extract timestamped frames, storyboards, and optional audio |
-| `analyze` | Analyze one or more videos with the configured multimodal model |
-| `relations` | Build candidate recall and recommendation edges |
-| `validate` | Validate timing, references, diversity, media files, and text |
-| `report` | Generate model-call and data-quality reports |
-| `export` | Export the human-review workbook |
-| `all` | Run the complete workflow |
-
-Useful options include `--video`, `--sample`, `--force`, `--workers`, `--dry-run`, and `--apply`.
-
 ## Safety principles
 
 - Never modify files below `raw/`.
 - Never fabricate visual labels from filenames alone.
 - Treat filenames only as weak supervision.
-- Stop safely if uncached videos require a model and no API key is configured.
+- Stop safely when uncached videos require a model and no API key is configured.
 - Keep model evidence and caches outside public repositories.
 - Block apply on invalid timing, missing references, duplicate IDs, missing media, or unusable copyright status.
-- Require human review for low confidence and ambiguous visual evidence.
+- Require human review for low confidence and ambiguous evidence.
 
 ## Self-check
 
 ```bash
-python scripts/self_check.py
+python unpacked/scripts/self_check.py
 ```
 
 Expected output:
@@ -206,19 +202,9 @@ Expected output:
 Skill self-check: PASS
 ```
 
-## Using the packaged skill
-
-A ready-to-install package is available at:
-
-```text
-dist/build-video-semantic-graph.skill
-```
-
-The source tree is the canonical version for review and contribution.
-
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Please do not submit copyrighted media, credentials, private model responses, or project-specific generated datasets.
+See [CONTRIBUTING.md](CONTRIBUTING.md). Do not submit copyrighted media, credentials, private model responses, or project-specific generated datasets.
 
 ## License
 
