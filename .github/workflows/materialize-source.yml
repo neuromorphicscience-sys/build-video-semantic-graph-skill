@@ -1,0 +1,98 @@
+name: Materialize skill source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".bootstrap/**"
+      - ".github/workflows/materialize-source.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Reconstruct source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/skill-source
+          cat \
+            .bootstrap/chunk-00 \
+            .bootstrap/chunk-01 \
+            .bootstrap/chunk-02 \
+            .bootstrap/chunk-03 \
+            .bootstrap/chunk-04 \
+            .bootstrap/spart-09 \
+            .bootstrap/spart-10 \
+            .bootstrap/spart-11 \
+            .bootstrap/spart-12 \
+            .bootstrap/spart-13 \
+            | base64 --decode > /tmp/source.tar.xz
+          echo "14cd7cae481ebc8b5b1772dadb5bc800aec90d9b7bc08c371ae6927c243d828f  /tmp/source.tar.xz" | sha256sum --check
+          tar -xJf /tmp/source.tar.xz -C /tmp/skill-source
+          cp -a /tmp/skill-source/build-video-semantic-graph/. ./
+          find . -type d -name __pycache__ -prune -exec rm -rf {} +
+          find . -type f -name '*.pyc' -delete
+
+      - name: Build installable skill package
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+
+          root = Path('.')
+          output = root / 'dist' / 'build-video-semantic-graph.skill'
+          output.parent.mkdir(parents=True, exist_ok=True)
+          include = [root / 'SKILL.md', root / 'agents', root / 'references', root / 'scripts']
+
+          with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+              for item in include:
+                  if item.is_file():
+                      archive.write(item, item.as_posix())
+                  else:
+                      for path in sorted(item.rglob('*')):
+                          if path.is_file() and '__pycache__' not in path.parts and path.suffix != '.pyc':
+                              archive.write(path, path.as_posix())
+
+          print(f'Built {output} ({output.stat().st_size} bytes)')
+          PY
+
+      - name: Validate source and package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q scripts
+          python scripts/self_check.py
+          test -s dist/build-video-semantic-graph.skill
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+
+          package = Path('dist/build-video-semantic-graph.skill')
+          with zipfile.ZipFile(package) as archive:
+              names = set(archive.namelist())
+          required = {'SKILL.md', 'agents/openai.yaml', 'scripts/run_pipeline.py'}
+          missing = required - names
+          if missing:
+              raise SystemExit(f'Missing package files: {sorted(missing)}')
+          print('Package validation: PASS')
+          PY
+
+      - name: Publish source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .bootstrap
+          rm -f .github/workflows/materialize-source.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Import open-source video semantic graph skill"
+          git push
