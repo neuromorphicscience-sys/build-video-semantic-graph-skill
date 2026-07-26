@@ -4,13 +4,15 @@ on:
   workflow_dispatch:
   issues:
     types: [opened]
+  pull_request_target:
+    types: [opened]
 
 permissions:
   contents: write
 
 jobs:
   materialize:
-    if: github.event_name == 'workflow_dispatch' || github.event.issue.title == 'materialize-source'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request_target' || github.event.issue.title == 'materialize-source'
     runs-on: ubuntu-latest
     steps:
       - name: Check out main
